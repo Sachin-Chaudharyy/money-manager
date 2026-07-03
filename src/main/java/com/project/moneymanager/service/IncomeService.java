@@ -26,7 +26,7 @@ public class IncomeService {
 
     public IncomeDTO addIncome(IncomeDTO dto) {
         ProfileEntity profile = profileService.getCurrentProfile();
-        CategoryEntity category = categoryRepository.findById(dto.getCategoryId())
+        CategoryEntity category = categoryRepository.findByIdAndProfileId(dto.getCategoryId(), profile.getId())
                 .orElseThrow(() -> new RuntimeException("Category not found"));
         IncomeEntity newIncome = toEntity(dto, profile, category);
         newIncome = incomeRepository.save(newIncome);

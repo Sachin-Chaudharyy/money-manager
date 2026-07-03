@@ -24,6 +24,9 @@ public class CategoryService {
         if(categoryRepository.existsByNameAndProfileId(categoryDTO.getName(), profile.getId())) {
             throw new RuntimeException("Category with this name already exists");
         }
+        if(!List.of("expense", "income").contains(categoryDTO.getType())) {
+            throw new RuntimeException("Invalid category type. Must be 'expense' or 'income'");
+        }
         CategoryEntity newCategory = toEntity(categoryDTO, profile);
         newCategory = categoryRepository.save(newCategory);
         return toDTO(newCategory);

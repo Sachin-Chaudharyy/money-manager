@@ -43,7 +43,7 @@ public class NotificationService {
         log.info("Job started: sendDailyExpenseSummary()");
         List<ProfileEntity> profiles = profileRepository.findAll();
         for(ProfileEntity profile : profiles) {
-            List<ExpenseDTO> todaysExpenses = expenseService.getExpensesForUserOnDate(profile.getId(), LocalDate.now());
+            List<ExpenseDTO> todaysExpenses = expenseService.getExpensesForProfileOnDate(profile.getId(), LocalDate.now());
             if(!todaysExpenses.isEmpty()) {
                 StringBuilder table = new StringBuilder();
                 table.append("<table style='border-collapse:collapse;width:100%;'>");

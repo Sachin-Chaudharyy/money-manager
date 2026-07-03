@@ -24,8 +24,8 @@ public class ExpenseService {
 
     public ExpenseDTO addExpense(ExpenseDTO dto) {
         ProfileEntity profile = profileService.getCurrentProfile();
-        CategoryEntity category = categoryRepository.findById(dto.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("Category not found"));
+        CategoryEntity category = categoryRepository.findByIdAndProfileId(dto.getCategoryId(), profile.getId())
+                .orElseThrow(() -> new RuntimeException("Category not found or accessible"));
         ExpenseEntity newExpense = toEntity(dto, profile, category);
         newExpense = expenseRepository.save(newExpense);
         return toDTO(newExpense);
@@ -68,7 +68,7 @@ public class ExpenseService {
         return list.stream().map(this::toDTO).toList();
     }
 
-    public List<ExpenseDTO> getExpensesForUserOnDate(Long profileId, LocalDate date) {
+    public List<ExpenseDTO> getExpensesForProfileOnDate(Long profileId, LocalDate date) {
         List<ExpenseEntity> list = expenseRepository.findByProfileIdAndDate(profileId, date);
         return list.stream().map(this::toDTO).toList();
     }
