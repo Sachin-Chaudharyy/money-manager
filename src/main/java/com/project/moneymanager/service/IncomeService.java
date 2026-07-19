@@ -11,6 +11,11 @@ import com.project.moneymanager.repository.IncomeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -23,6 +28,7 @@ public class IncomeService {
     private final CategoryRepository categoryRepository;
     private final IncomeRepository incomeRepository;
     private final ProfileService  profileService;
+    private final EmailService emailService;
 
     public IncomeDTO addIncome(IncomeDTO dto) {
         ProfileEntity profile = profileService.getCurrentProfile();
@@ -68,6 +74,51 @@ public class IncomeService {
         ProfileEntity profile = profileService.getCurrentProfile();
         List<IncomeEntity> list = incomeRepository.findByProfileIdAndDateBetweenAndNameContainingIgnoreCase(profile.getId(), startDate, endDate, keyword, sort);
         return list.stream().map(this::toDTO).toList();
+    }
+
+    public List<IncomeDTO> getAllIncomesForCurrentUser() {
+        ProfileEntity profile = profileService.getCurrentProfile();
+        List<IncomeEntity> list = incomeRepository.findByProfileIdOrderByIdAsc(profile.getId());
+        return list.stream().map(this::toDTO).toList();
+    }
+
+    public ByteArrayInputStream generateIncomeExcel(List<IncomeDTO> incomes) throws IOException {
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("Income");
+            Row headerRow = sheet.createRow(0);
+            String[] headers = {"S.No", "Name", "Category", "Amount", "Date"};
+            for (int i = 0; i < headers.length; i++) {
+                headerRow.createCell(i).setCellValue(headers[i]);
+            }
+            int rowIdx = 1;
+            int serialNo = 1;
+            for (IncomeDTO income : incomes) {
+                Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(serialNo++);
+                row.createCell(1).setCellValue(income.getName());
+                row.createCell(2).setCellValue(income.getCategoryName() != null ? income.getCategoryName() : "");
+                row.createCell(3).setCellValue(income.getAmount().doubleValue());
+                row.createCell(4).setCellValue(income.getDate().toString());
+            }
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+            workbook.write(out);
+            return new ByteArrayInputStream(out.toByteArray());
+        }
+    }
+
+    public void emailIncomeExcelToCurrentUser() throws IOException {
+        ProfileEntity profile = profileService.getCurrentProfile();
+        ByteArrayInputStream excelFile = generateIncomeExcel(getAllIncomesForCurrentUser());
+
+        emailService.sendEmailWithAttachment(
+                profile.getEmail(),
+                "Your Income Details",
+                "Hi " + profile.getFullName() + ",\n\nPlease find attached your income details.\n\nRegards,\nMoney Manager",
+                excelFile,
+                "income_details.xlsx"
+        );
     }
 
     private IncomeEntity toEntity(IncomeDTO dto, ProfileEntity profile, CategoryEntity category){

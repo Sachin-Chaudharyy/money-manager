@@ -1,6 +1,7 @@
 package com.project.moneymanager.repository;
 
 import com.project.moneymanager.entity.ExpenseEntity;
+import com.project.moneymanager.entity.IncomeEntity;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -15,6 +16,8 @@ public interface ExpenseRepository extends JpaRepository<ExpenseEntity, Long> {
     List<ExpenseEntity> findByProfileIdOrderByDateDesc(Long profileId);
 
     List<ExpenseEntity> findTop5ByProfileIdOrderByDateDesc(Long profileId);
+
+    List<ExpenseEntity> findByProfileIdOrderByIdAsc(Long profileId);
 
     @Query("SELECT SUM(e.amount) FROM ExpenseEntity e WHERE e.profile.id = :profileId")
     BigDecimal findTotalExpenseByProfileId(@Param("profileId") long profileId);

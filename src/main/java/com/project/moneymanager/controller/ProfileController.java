@@ -55,4 +55,10 @@ public class ProfileController {
     public String test() {
         return "test sucks";
     }
+
+    @GetMapping("/profile")
+    public ResponseEntity<ProfileDTO> getPublicProfile() {
+        ProfileDTO profileDTO = profileService.getPublicProfile(null);
+        return  ResponseEntity.status(HttpStatus.OK).body(profileDTO);
+    }
 }
