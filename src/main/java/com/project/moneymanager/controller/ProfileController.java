@@ -59,7 +59,7 @@ public class ProfileController {
 
     @GetMapping("/test")
     public String test() {
-        return "test sucks";
+        return "test running";
     }
 
     @GetMapping("/profile")
