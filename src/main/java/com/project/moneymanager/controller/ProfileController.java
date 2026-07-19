@@ -4,11 +4,13 @@ import com.project.moneymanager.dto.AuthDTO;
 import com.project.moneymanager.dto.ProfileDTO;
 import com.project.moneymanager.service.ProfileService;
 import lombok.RequiredArgsConstructor;
-import org.apache.coyote.Response;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.Map;
 
 @RestController
@@ -18,6 +20,9 @@ public class ProfileController {
 
     private final ProfileService profileService;
 
+    @Value("${money.manager.frontend.url}")
+    private String frontendUrl;
+
     @PostMapping("/register")
     public ResponseEntity<ProfileDTO> registerProfile(@RequestBody ProfileDTO profileDTO) {
         ProfileDTO registeredProfile = profileService.registerProfile(profileDTO);
@@ -25,13 +30,14 @@ public class ProfileController {
     }
 
     @GetMapping("/activate")
-    public ResponseEntity<String> activateProfile(@RequestParam String token) {
+    public ResponseEntity<Void> activateProfile(@RequestParam String token) {
         boolean isActivated = profileService.activateProfile(token);
-        if (isActivated) {
-            return ResponseEntity.status(HttpStatus.OK).body("Profile activated successfully");
-        } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Activation token not found or already used");
-        }
+        String redirectUrl = isActivated
+                ? frontendUrl + "login?activated=true"
+                : frontendUrl + "/login?activated=false";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setLocation(URI.create(redirectUrl));
+        return new ResponseEntity<>(headers, HttpStatus.FOUND);
     }
 
     @PostMapping("/login")
