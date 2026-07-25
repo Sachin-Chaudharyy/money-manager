@@ -16,6 +16,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.util.Map;
 import java.util.UUID;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.json.gson.GsonFactory;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import java.security.GeneralSecurityException;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -31,7 +39,13 @@ public class ProfileService {
     @Value("${app.activation.url}")
     private String activationURL;
 
+    @Value("${google.oauth.client-id}")
+    private String googleClientId;
+
     public ProfileDTO registerProfile(ProfileDTO profileDTO) {
+        if (profileRepository.findByEmail(profileDTO.getEmail()).isPresent()) {
+            throw new RuntimeException("Email already registered");
+        }
         ProfileEntity newProfile = toEntity(profileDTO);
         newProfile.setActivationToken(UUID.randomUUID().toString());
         newProfile = profileRepository.save(newProfile);
@@ -41,6 +55,47 @@ public class ProfileService {
         String body = "Click on the following link to activate your Money Manager account: " + activationLink;
         emailService.sendEmail(newProfile.getEmail(), subject, body);
         return toDTO(newProfile);
+    }
+
+    public Map<String, Object> authenticateWithGoogle(String idToken) {
+        try {
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
+                    new NetHttpTransport(), GsonFactory.getDefaultInstance())
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
+
+            GoogleIdToken googleIdToken = verifier.verify(idToken);
+            if (googleIdToken == null) {
+                throw new RuntimeException("Invalid Google token");
+            }
+
+            GoogleIdToken.Payload payload = googleIdToken.getPayload();
+            String email = payload.getEmail();
+            String fullName = (String) payload.get("name");
+            String pictureUrl = (String) payload.get("picture");
+
+            ProfileEntity profile = profileRepository.findByEmail(email)
+                    .orElseGet(() -> {
+                        ProfileEntity newProfile = ProfileEntity.builder()
+                                .fullName(fullName)
+                                .email(email)
+                                // random unusable password since login will always be via Google
+                                .password(passwordEncoder.encode(UUID.randomUUID().toString()))
+                                .profileImageUrl(pictureUrl)
+                                .build();
+                        newProfile.setIsActive(true); // Google already verified the email
+                        return profileRepository.save(newProfile);
+                    });
+
+            String token = jwtUtil.generateToken(profile.getEmail());
+            return Map.of(
+                    "token", token,
+                    "user", toDTO(profile)
+            );
+
+        } catch (GeneralSecurityException | IOException e) {
+            throw new RuntimeException("Google authentication failed: " + e.getMessage());
+        }
     }
 
     public ProfileEntity toEntity(ProfileDTO profileDTO) {

@@ -9,6 +9,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.project.moneymanager.dto.GoogleAuthDTO;
 
 import java.net.URI;
 import java.util.Map;
@@ -24,16 +25,22 @@ public class ProfileController {
     private String frontendUrl;
 
     @PostMapping("/register")
-    public ResponseEntity<ProfileDTO> registerProfile(@RequestBody ProfileDTO profileDTO) {
-        ProfileDTO registeredProfile = profileService.registerProfile(profileDTO);
-        return ResponseEntity.status(HttpStatus.CREATED).body(registeredProfile);
+    public ResponseEntity<Map<String, Object>> registerProfile(@RequestBody ProfileDTO profileDTO) {
+        try {
+            ProfileDTO registeredProfile = profileService.registerProfile(profileDTO);
+            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("user", registeredProfile));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                    "message", e.getMessage()
+            ));
+        }
     }
 
     @GetMapping("/activate")
     public ResponseEntity<Void> activateProfile(@RequestParam String token) {
         boolean isActivated = profileService.activateProfile(token);
         String redirectUrl = isActivated
-                ? frontendUrl + "login?activated=true"
+                ? frontendUrl + "/login?activated=true"
                 : frontendUrl + "/login?activated=false";
         HttpHeaders headers = new HttpHeaders();
         headers.setLocation(URI.create(redirectUrl));
@@ -53,6 +60,18 @@ public class ProfileController {
         }catch (Exception e){
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
                     "message" , e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/auth/google")
+    public ResponseEntity<Map<String, Object>> loginWithGoogle(@RequestBody GoogleAuthDTO googleAuthDTO) {
+        try {
+            Map<String, Object> response = profileService.authenticateWithGoogle(googleAuthDTO.getIdToken());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                    "message", e.getMessage()
             ));
         }
     }
