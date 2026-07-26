@@ -6,6 +6,7 @@ import com.project.moneymanager.entity.ProfileEntity;
 import com.project.moneymanager.repository.ProfileRepository;
 import com.project.moneymanager.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -23,8 +24,8 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import java.security.GeneralSecurityException;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProfileService {
@@ -49,11 +50,14 @@ public class ProfileService {
         ProfileEntity newProfile = toEntity(profileDTO);
         newProfile.setActivationToken(UUID.randomUUID().toString());
         newProfile = profileRepository.save(newProfile);
-        //send activation email
-        String activationLink = activationURL+"/api/v1.0/activate?token=" + newProfile.getActivationToken();
-        String subject = "Activate your Money Manager account";
-        String body = "Click on the following link to activate your Money Manager account: " + activationLink;
-        emailService.sendEmail(newProfile.getEmail(), subject, body);
+
+        String activationLink = activationURL + "/api/v1.0/activate?token=" + newProfile.getActivationToken();
+        emailService.sendEmail(
+                newProfile.getEmail(),
+                "Activate your Money Manager account",
+                "Click on the following link to activate your Money Manager account: " + activationLink
+        );
+
         return toDTO(newProfile);
     }
 
@@ -79,12 +83,20 @@ public class ProfileService {
                         ProfileEntity newProfile = ProfileEntity.builder()
                                 .fullName(fullName)
                                 .email(email)
-                                // random unusable password since login will always be via Google
                                 .password(passwordEncoder.encode(UUID.randomUUID().toString()))
                                 .profileImageUrl(pictureUrl)
                                 .build();
-                        newProfile.setIsActive(true); // Google already verified the email
-                        return profileRepository.save(newProfile);
+                        newProfile.setIsActive(true); // Google already verified the email, active right away
+                        ProfileEntity savedProfile = profileRepository.save(newProfile);
+
+                        String subject = "Welcome to Money Manager!";
+                        String body = "Hi " + savedProfile.getFullName() + ",<br><br>"
+                                + "Welcome to Money Manager! We're excited to have you onboard.<br><br>"
+                                + "Start tracking your income and expenses today and take control of your finances.<br><br>"
+                                + "Best regards,<br>Money Manager Team";
+                        sendEmailSafely(savedProfile.getEmail(), subject, body);
+
+                        return savedProfile;
                     });
 
             String token = jwtUtil.generateToken(profile.getEmail());
@@ -122,11 +134,28 @@ public class ProfileService {
 
     }
 
+    private void sendEmailSafely(String to, String subject, String body) {
+        try {
+            emailService.sendEmail(to, subject, body);
+        } catch (Exception e) {
+            log.error("Failed to send email to {}: {}", to, e.getMessage());
+        }
+    }
+
     public boolean activateProfile(String activationToken) {
         return profileRepository.findByActivationToken(activationToken)
                 .map(profile -> {
                     profile.setIsActive(true);
                     profileRepository.save(profile);
+
+                    // send welcome email now that the account is actually active
+                    String subject = "Welcome to Money Manager!";
+                    String body = "Hi " + profile.getFullName() + ",<br><br>"
+                            + "Your Money Manager account is now active! We're excited to have you onboard.<br><br>"
+                            + "Start tracking your income and expenses today and take control of your finances.<br><br>"
+                            + "Best regards,<br>Money Manager Team";
+                    sendEmailSafely(profile.getEmail(), subject, body);
+
                     return true;
                 })
                 .orElse(false);
